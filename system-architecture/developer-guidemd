@@ -1,0 +1,150 @@
+# Garmin MES Developer Guide
+
+## I. Overview
+
+This guide provides comprehensive information for developers working on the Garmin MES (Manufacturing Execution System) project. The project is a TypeScript-based web application built with Vite, utilizing Zustand for state management, MQTT for real-time services, and Tailwind CSS for styling. It integrates with multiple backend APIs and supports features like smart material management, storage monitoring, and task handling.
+
+## II. Project Structure
+
+The project follows a modular architecture as outlined in [projects/docs/Project.structure.md](projects/docs/Project.structure.md). Key components include:
+
+- **Infrastructure**:
+  - `apis/`: API integrations from multiple backend services (e.g., Matone Computing, MCCS, MTCS, MTMS).
+  - `services/`: MQTT services for real-time communication.
+  - `stores/`: Zustand stores for global state management.
+  - `hooks/`: Custom React hooks.
+  - `components/`: Reusable UI components.
+  - `modules/`: Feature-specific modules containing logic, state, hooks, and utilities.
+  - `interfaces/`: TypeScript interfaces.
+  - `assets/`: Static assets, including i18n translations.
+
+- **Routing**:
+  - `routing/`: Establishes routing for features.
+
+- **Features**:
+  - `features/`: Core features like shared (e.g., home) and smart-material (e.g., storage-management).
+  - Sub-features under `storage-management`: monitoring, overview, task-history, tasks.
+
+- **Other Directories**:
+  - `environments/`: Environment-specific configurations.
+  - `providers/`: Context providers.
+  - `utils/`: Utility functions.
+  - `test/`: Testing utilities.
+  - `e2e/`: End-to-end tests using Playwright.
+  - `public/`: Public assets.
+  - `script/`: Scripts for feature generation and file updates.
+
+## III. Setup
+
+1. **Prerequisites**:
+   - Node.js (version specified in [projects/garmin.mes/package.json](projects/garmin.mes/package.json)).
+   - Docker (for containerized deployment).
+
+2. **Installation**:
+   - Clone the repository.
+   - Navigate to `projects/garmin.mes/`.
+   - Run npm install to install dependencies.
+
+3. **Environment Configuration**:
+   - .env provide base configuration that is unified for all envs.
+   - .env.[envName] config environment specific variables (e.g., for TW-EXP, TW-PROD, etc.).
+   - Load environments using [projects/garmin.mes/src/environments/environment.loader.ts](projects/garmin.mes/src/environments/environment.loader.ts).
+
+4. **Development Server**:
+   - Run npm run dev to start the Vite development server.
+   - Access the app at http://localhost:5173 (or as configured).
+   - Run specific environments at local:
+     - npm run dev - Local environment
+     - npm run dev:tw-stage - Staging environment
+     - npm run dev:tw-prod - Production environment
+
+## IV. Development
+
+- **Coding Standards**:
+  - Use ESLint (configured in [projects/garmin.mes/eslint.config.js](projects/garmin.mes/eslint.config.js)) and Prettier ([projects/garmin.mes/.prettierrc](projects/garmin.mes/.prettierrc)).
+  - Follow TypeScript best practices.
+
+- **Adding Features**:
+  - Use the feature generator script: `node generate-feature.mjs`.
+  - Update routing in src/routing/ and add to `features/`.
+
+- **State Management**:
+  - Use Zustand stores in src/stores/ for global state.
+  - Integrate with hooks in `src/hooks/`.
+
+- **API and Services**:
+  - Define APIs in `src/apis/`.
+  - Handle MQTT in `src/services/`.
+
+- **Styling**:
+  - Use Tailwind CSS (configured in [projects/garmin.mes/tailwind.config.ts](projects/garmin.mes/tailwind.config.ts)).
+
+- **Internationalization**:
+  - Manage translations in `src/assets/i18n/`, linked to features.
+
+## V. Development Requirements
+
+### Important Notices
+
+1. **Always use enums for backend enum data**: When retrieving enum-related values from backend services, always use the defined enums (such as `ElementTypeCode`, `ElementCellTypeCode`, `ElementStatusCode`, etc.) instead of hardcoded strings. This ensures type safety and consistency.
+
+```typescript
+// ✅ Good: Use enum
+const elements = await getElementsByTypeCode(
+  areaId,
+  ElementTypeCode.PRODUCTION_LINE,
+);
+
+// ❌ Bad: Hardcoded string
+const elements = await getElementsByTypeCode(areaId, 'PRODUCTION_LINE');
+```
+
+If backend service defined enum data for specific column, always defined a enum to get it. The following example defined Promise<TasksSummary[]> to recieved data from backend
+
+```typescript
+export const getTasksSummary = async (
+  areaId: number,
+): Promise<TasksSummary[]> => {
+  try {
+    const params = { areaId };
+    const url = `${environment.mtmsUrl}/tasks/summary`;
+    const response = await axios.get<TasksSummary[]>(url, {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    console.log('Error fetching tasks summary:', error);
+    throw new Error('An unexpected error occurred while fetching tasks');
+  }
+};
+```
+
+You'll notice that instead of using string to define taskTypeName directly, we use
+enum to make sure type safety
+
+```typescript
+export interface TasksSummary {
+  id: string;
+  statusName: TaskStatus;
+  taskTypeName: TaskType;
+  deviceTypeName: Tower;
+  createdAt: string;
+  createdBy: string;
+  shopOrder?: string;
+  operationCode?: number;
+  lineId?: string;
+}
+```
+
+Then defined a enum type for task type.
+
+```typescript
+export enum TaskType {
+  Retrieval = 'Retrieval',
+  Storage = 'Storage',
+}
+```
+
+2. **Validate API responses**: Always validate and handle API response errors properly. Use the success flags and error messages returned by backend services.
+
+3. **Handle loading and error states**: Implement proper loading indicators and error handling in UI components, especially for asynchronous operations.
